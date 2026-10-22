@@ -111,6 +111,8 @@ public:
 	char passphrase[128] = "";
 	bool encrypt = false;
 	bool requireEncrypted = false;
+	std::string appliedPassphrase; // what the peer is using now
+	bool showPassphrase = false;
 
 	// chat
 	char myName[64] = "";

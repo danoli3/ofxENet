@@ -35,6 +35,7 @@ void ofApp::setup() {
 		std::snprintf(passphrase, sizeof(passphrase), "%s", startPassphrase.c_str());
 		encrypt = true;
 		peer.setPassphrase(passphrase);
+		appliedPassphrase = passphrase;
 		info("encrypting, key " + peer.getFingerprint());
 	}
 
@@ -326,19 +327,37 @@ void ofApp::drawConnection() {
 
 void ofApp::drawEncryption() {
 	ImGui::SeparatorText("Encryption");
-	bool changed = ImGui::InputText("passphrase", passphrase, sizeof(passphrase),
-		ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
-	changed |= ImGui::Checkbox("encrypt messages", &encrypt);
-	if (changed) {
-		// derives the key (PBKDF2-HMAC-SHA256, 200000 iterations, new random salt)
-		peer.setPassphrase(encrypt ? passphrase : "");
-		info(peer.isEncrypting() ? "encrypting, key " + peer.getFingerprint() : "not encrypting");
-	}
+	// applied on Enter, when the field loses focus, or when "encrypt messages" changes
+	// (not on every key: deriving the key takes a moment, 200000 PBKDF2 iterations)
+	bool apply = ImGui::InputText("##passphrase", passphrase, sizeof(passphrase),
+		(showPassphrase ? 0 : ImGuiInputTextFlags_Password) | ImGuiInputTextFlags_EnterReturnsTrue);
+	apply |= ImGui::IsItemDeactivatedAfterEdit();
+	ImGui::SameLine(0, 4);
+	if (ImGui::SmallButton(showPassphrase ? "hide" : "show")) showPassphrase = !showPassphrase;
+	ImGui::SetItemTooltip(showPassphrase ? "hide the passphrase" : "show the passphrase");
+	ImGui::SameLine();
+	ImGui::TextUnformatted("passphrase");
+	apply |= ImGui::Checkbox("encrypt messages", &encrypt);
 	ImGui::SetItemTooltip("AES-256-GCM; every peer needs the same passphrase");
+	if (apply) {
+		const std::string wanted = encrypt ? passphrase : "";
+		if (wanted != appliedPassphrase) {
+			// derives the key (PBKDF2-HMAC-SHA256, new random salt)
+			peer.setPassphrase(wanted);
+			appliedPassphrase = wanted;
+			info(peer.isEncrypting() ? "encrypting, key " + peer.getFingerprint() : "not encrypting");
+		}
+	}
 	ImGui::SameLine();
 	if (ImGui::Checkbox("reject unencrypted", &requireEncrypted)) peer.requireEncryption = requireEncrypted;
 	ImGui::SetItemTooltip("drop messages that aren't encrypted with this passphrase");
-	if (peer.isEncrypting()) {
+
+	const ImVec4 warning(1.f, 0.75f, 0.3f, 1.f);
+	if (encrypt && passphrase[0] == '\0') {
+		ImGui::TextColored(warning, "type a passphrase to encrypt (messages are sent in the clear)");
+	} else if (encrypt && appliedPassphrase != passphrase) {
+		ImGui::TextColored(warning, "press Enter to use the new passphrase");
+	} else if (peer.isEncrypting()) {
 		ImGui::TextColored(RECEIVED_COLOR, "encrypting   key fingerprint %s", peer.getFingerprint().c_str());
 		ImGui::SetItemTooltip("the same on every machine with the same passphrase: compare them");
 	} else {
