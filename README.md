@@ -107,7 +107,7 @@ the next find the port taken and connect to it. To connect across machines, set 
 | `example_cursors` | every copy's mouse cursor in every window (unreliable sequenced, relayed by the server) |
 | `example_chat` | type and press Enter: JSON lines to everyone (reliable ordered) |
 | `example_imgui_messenger` | needs [ofxImGui](https://github.com/jvcleave/ofxImGui) (`develop`): connection settings, a passphrase for encryption (with key fingerprint), a peer list with ping (pick who to send to, kick), compose text or JSON with any reliability / channel, a chat view and a filterable log with each message's SHA-256, and server relay with the original sender framed in. Start encrypted with `"passphrase"` in `settings.json` or `OFXENET_PASSPHRASE` |
-| `example_tests` | the addon's tests, headless: servers and clients on localhost, text, JSON, a 1 MB message, broadcast, passwords, full servers, channels and types, and encryption (62 checks) |
+| `example_tests` | headless localhost checks: text, JSON, a 1 MB message, broadcast, passwords, full servers, channels, and encryption. The security checks refuse an empty or wrong password, a truncated or garbage envelope, a flipped authentication tag, a different passphrase, and a different PBKDF2 stretch |
 
 Build them with projectGenerator, or copy `scripts/templates/<platform>/Makefile` and `config.make`
 into the example folder.
@@ -125,10 +125,14 @@ into the example folder.
 
 ## Platforms
 
+Supported openFrameworks release: **0.12.1**. GitHub Actions clones current
+`openframeworks/openFrameworks` master, prints that version and commit on the job summary, builds the
+examples, and runs `example_tests` on Linux and macOS. The security checks stay on localhost.
+
 Tested on macOS (Apple Silicon) with the openFrameworks makefiles, projectGenerator / Xcode, and
-AddressSanitizer, and in CI on Linux and macOS. ENet itself supports Windows, Linux, macOS, iOS and
-Android. Visual Studio links `ws2_32` and `winmm` from `enet.h`; MSYS2 gets `-lwinmm` from
-`addon_config.mk`. OpenSSL (for encryption and the password hash) comes from openFrameworks.
+AddressSanitizer. ENet itself supports Windows, Linux, macOS, iOS and Android. Visual Studio links
+`ws2_32` and `winmm` from `enet.h`; MSYS2 gets `-lwinmm` from `addon_config.mk`. OpenSSL (for
+encryption and the password hash) comes from openFrameworks.
 
 ## License
 

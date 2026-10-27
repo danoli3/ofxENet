@@ -33,6 +33,22 @@ jobs:
       - name: openFrameworks master
         run: git clone --depth 1 https://github.com/openframeworks/openFrameworks "$OF"
 
+      - name: Record the openFrameworks version
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, subprocess
+          root = pathlib.Path(os.environ["OF"])
+          text = (root / "libs/openFrameworks/utils/ofConstants.h").read_text()
+          nums = [re.search(rf"#define OF_VERSION_{name}\s+(\d+)", text).group(1) for name in ("MAJOR", "MINOR", "PATCH")]
+          sha = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+          line = "openFrameworks %s (%s)" % (".".join(nums), sha)
+          print(line)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as handle:
+                  handle.write(line + "\n")
+          PY
+
       # straight into of/addons so the examples' ../../.. reaches the OF root
       - uses: actions/checkout@v6
         with:
@@ -48,8 +64,8 @@ jobs:
       - name: openFrameworks libraries
         run: |
           if [ "${{ matrix.name }}" = "linux64" ]; then
-            # the same package openFrameworks' own Linux CI uses
-            "$OF/scripts/linux/download_libs.sh" -t latest -a 64gcc6
+            # master publishes openFrameworksLibs_latest_linux_64_gcc10
+            "$OF/scripts/linux/download_libs.sh" -t latest -a 64
           else
             "$OF/scripts/osx/download_libs.sh" -t latest
           fi

@@ -49,6 +49,7 @@ class ofApp : public ofxUnitTestsApp {
 		testChannelsAndTypes();
 		testCipher();
 		testEncryptedMessages();
+		testSecurity();
 	}
 
 	void testConnectAndMessages() {
@@ -258,6 +259,39 @@ class ofApp : public ofxUnitTestsApp {
 		ofxTest(detail::pump({ &server, &client, &intruder }, [&] { return !s.messages.empty(); }), "authentic message delivered");
 		detail::pump({ &server, &client, &intruder }, [] { return false; }, 300);
 		ofxTestEq(s.messages.size(), size_t(1), "requireEncryption drops the wrong-passphrase message");
+	}
+
+	// Hostile packets stay on localhost. Nothing listens on a public address.
+	void testSecurity() {
+		using namespace ofxENet::crypto;
+		Cipher room, same, stretched, stranger;
+		room.setPassphrase("installation-42", 200000);
+		same.setPassphrase("installation-42", 200000);
+		stretched.setPassphrase("installation-42", 1000000);
+		stranger.setPassphrase("guess", 200000);
+
+		const auto sealed = room.encrypt("secret plan");
+		const auto opened = same.decrypt(sealed);
+		ofxTest(opened && *opened == "secret plan", "matching stretch opens the envelope");
+		ofxTest(!stretched.decrypt(sealed), "a longer PBKDF2 stretch does not open it");
+		ofxTest(!stranger.decrypt(sealed), "another passphrase does not open it");
+		ofxTest(!room.decrypt(sealed.substr(0, Cipher::OVERHEAD - 1)), "a truncated envelope is dropped");
+		ofxTest(!Cipher::isEnvelope("not an envelope"), "garbage is not an envelope");
+		ofxTest(!room.decrypt(std::string(80, '\x01')), "garbage bytes are dropped");
+		auto torn = sealed;
+		torn.back() ^= 1;
+		ofxTest(!room.decrypt(torn), "a flipped authentication tag is rejected");
+
+		Peer server, client;
+		detail::Log clientLog;
+		clientLog.attach(client);
+		server.startServer(0, 4, "secret");
+		client.connect("127.0.0.1", server.getPort(), "");
+		ofxTest(detail::pump({ &server, &client }, [&] { return !clientLog.disconnects.empty(); }), "an empty password is refused");
+		if (!clientLog.disconnects.empty()) {
+			ofxTest(clientLog.disconnects[0].reason == DisconnectionEvent::Reason::InvalidPassword, "reason: empty password");
+		}
+		server.stop();
 	}
 
 };
